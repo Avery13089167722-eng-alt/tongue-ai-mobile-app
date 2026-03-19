@@ -71,10 +71,6 @@ try:
     from jnius import autoclass
 except Exception:
     autoclass = None
-try:
-    from jnius import jarray
-except Exception:
-    jarray = None
 
 
 KV_FILE = "ui.kv"
@@ -668,19 +664,12 @@ class TongueApp(MDApp):
             ins = BufferedInputStream(ins)
             outs = BufferedOutputStream(FileOutputStream(target))
             try:
-                if jarray is not None:
-                    buf = jarray("b")(8192)
-                    while True:
-                        n = ins.read(buf)
-                        if n == -1:
-                            break
-                        outs.write(buf, 0, n)
-                else:
-                    while True:
-                        b = ins.read()
-                        if b == -1:
-                            break
-                        outs.write(b)
+                # 兼容性优先：避免 jarray 在部分机型/环境抛异常导致读取失败。
+                while True:
+                    b = ins.read()
+                    if b == -1:
+                        break
+                    outs.write(b)
                 outs.flush()
             finally:
                 try:
@@ -795,11 +784,9 @@ class TongueApp(MDApp):
             self._bind_android_activity_result()
             Intent = autoclass("android.content.Intent")
             act = autoclass("org.kivy.android.PythonActivity").mActivity
-            intent = Intent(Intent.ACTION_OPEN_DOCUMENT)
+            intent = Intent(Intent.ACTION_GET_CONTENT)
             intent.setType("image/*")
-            intent.addCategory(Intent.CATEGORY_OPENABLE)
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            intent.addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
             chooser = Intent.createChooser(intent, "选择舌象图片")
             act.startActivityForResult(chooser, self._gallery_request_code)
             return True
@@ -837,8 +824,7 @@ class TongueApp(MDApp):
                 PythonActivity = autoclass("org.kivy.android.PythonActivity")
                 resolver = PythonActivity.mActivity.getContentResolver()
                 Intent = autoclass("android.content.Intent")
-                take_flags = Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION
-                resolver.takePersistableUriPermission(uri, take_flags)
+                resolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             except Exception:
                 pass
             source = str(uri.toString())
