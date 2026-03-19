@@ -38,8 +38,7 @@ jobs:
             pkg-config \
             zlib1g-dev \
             libncurses6 \
-            libncurses5 \
-            libtinfo5 \
+            libtinfo6 \
             cmake \
             libffi-dev \
             libssl-dev
