@@ -1,0 +1,10 @@
+{
+  "api_base_url": "http://8.160.184.31:8001",
+  "api_path": "/v1/tongue-analyze",
+  "text_api_path": "/v1/text-chat",
+  "api_timeout": 90,
+  "api_token": "",
+  "retry_count": 2,
+  "retry_backoff_sec": 1.5,
+  "db_path": "tongue_records.db"
+}

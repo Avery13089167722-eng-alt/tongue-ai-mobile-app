@@ -1,0 +1,169 @@
+MDScreen:
+    canvas.before:
+        Color:
+            rgba: 0.07, 0.07, 0.09, 1
+        Rectangle:
+            pos: self.pos
+            size: self.size
+
+    MDBoxLayout:
+        orientation: "vertical"
+        padding: 0
+        spacing: 0
+
+        # 顶部标题栏
+        MDBoxLayout:
+            size_hint_y: None
+            height: "64dp"
+            padding: "16dp", "12dp", "16dp", "12dp"
+            spacing: "10dp"
+            canvas.before:
+                Color:
+                    rgba: 0.10, 0.10, 0.12, 1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+                Color:
+                    rgba: 0.15, 0.15, 0.17, 1
+                Line:
+                    points: self.x, self.y, self.right, self.y
+                    width: 1
+
+            MDLabel:
+                text: "舌征智析"
+                bold: True
+                halign: "left"
+                valign: "middle"
+                size_hint_y: None
+                height: "40dp"
+                text_size: self.size
+                font_name: "Roboto"
+                font_size: "20sp"
+                theme_text_color: "Custom"
+                text_color: 1, 1, 1, 1
+
+        # 聊天区域
+        ScrollView:
+            id: chat_scroll
+            size_hint_y: 1
+            bar_width: 6
+            bar_color: 0.3, 0.3, 0.3, 0.5
+            bar_inactive_color: 0.2, 0.2, 0.2, 0.3
+            do_scroll_x: False
+            do_scroll_y: True
+            scroll_type: ['bars', 'content']
+            effect_cls: "ScrollEffect"
+            scroll_timeout: 100
+
+            MDList:
+                id: chat_list
+                padding: "16dp", "12dp", "16dp", "12dp"
+                spacing: "16dp"
+                size_hint_y: None
+                height: self.minimum_height
+
+        # 加载进度条
+        MDBoxLayout:
+            size_hint_y: None
+            height: "4dp"
+            padding: 0
+
+            MDProgressBar:
+                id: progress_bar
+                type: "indeterminate"
+                running_duration: 0.6
+                catching_duration: 0.6
+                opacity: 0
+                active: False
+                color: 0.3, 0.7, 1, 1
+                size_hint_x: 1
+
+        # 输入区域
+        MDBoxLayout:
+            size_hint_y: None
+            height: "72dp"
+            padding: "12dp", "8dp", "12dp", "8dp"
+            spacing: "8dp"
+            canvas.before:
+                Color:
+                    rgba: 0.10, 0.10, 0.12, 1
+                Rectangle:
+                    pos: self.pos
+                    size: self.size
+                Color:
+                    rgba: 0.15, 0.15, 0.17, 1
+                Line:
+                    points: self.x, self.top, self.right, self.top
+                    width: 1
+
+            # 拍照按钮
+            MDIconButton:
+                icon: "camera"
+                theme_text_color: "Custom"
+                text_color: 0.6, 0.6, 0.6, 1
+                user_font_size: "24sp"
+                on_release: app.capture_image()
+                size_hint_x: None
+                width: "48dp"
+                padding: "12dp"
+
+            # 选图按钮
+            MDIconButton:
+                icon: "image"
+                theme_text_color: "Custom"
+                text_color: 0.6, 0.6, 0.6, 1
+                user_font_size: "24sp"
+                on_release: app.pick_image()
+                size_hint_x: None
+                width: "48dp"
+                padding: "12dp"
+
+            # 输入框容器
+            MDBoxLayout:
+                size_hint_x: 1
+                padding: "8dp", "4dp", "8dp", "4dp"
+                canvas.before:
+                    Color:
+                        rgba: 0.15, 0.15, 0.17, 1
+                    RoundedRectangle:
+                        pos: self.pos
+                        size: self.size
+                        radius: [20, 20, 20, 20]
+
+                TextInput:
+                    id: note_input
+                    font_name: "Roboto"
+                    hint_text: "输入问题或选择舌象图片..."
+                    hint_text_color: 0.5, 0.5, 0.5, 1
+                    multiline: False
+                    size_hint_x: 1
+                    size_hint_y: None
+                    height: "40dp"
+                    on_text_validate: app.analyze_now()
+                    foreground_color: 1, 1, 1, 1
+                    cursor_color: 0.3, 0.7, 1, 1
+                    background_color: 0.15, 0.15, 0.17, 1
+                    padding: "12dp", "10dp"
+                    font_size: "16sp"
+
+            # 发送按钮
+            MDIconButton:
+                id: analyze_btn
+                icon: "send"
+                theme_text_color: "Custom"
+                text_color: 0.3, 0.7, 1, 1
+                user_font_size: "24sp"
+                disabled: True
+                on_release: app.analyze_now()
+                size_hint_x: None
+                width: "48dp"
+                padding: "12dp"
+                canvas.before:
+                    Color:
+                        rgba: 0.3, 0.7, 1, 0.2 if not self.disabled else 0.1
+                    Ellipse:
+                        pos: self.pos
+                        size: self.size
+                        angle_start: 0
+                        angle_end: 360
+
