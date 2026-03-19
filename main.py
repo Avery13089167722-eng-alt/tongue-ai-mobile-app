@@ -4,9 +4,11 @@ import sys
 import threading
 import time
 import traceback
+import shutil
 from datetime import datetime
 from functools import partial
 from pathlib import Path
+from urllib.parse import unquote
 
 #
 # Windows 中文输入法候选框不显示：通常需要启用 SDL 的 IME UI 提示。
@@ -249,6 +251,22 @@ class TongueApp(MDApp):
         # 取消自动滚动：用户手动滚动后不再被程序强制拉回底部。
         if platform == "android":
             self._bind_android_activity_result()
+            # 首次进入即显式请求拍照/选图所需权限，避免点击拍照才提示未授权。
+            self._request_initial_android_permissions()
+
+    def _request_initial_android_permissions(self):
+        if platform != "android" or request_permissions is None:
+            return
+        perms = self._required_android_perms_for_capture()
+        if not perms:
+            return
+        missing = [p for p in perms if not self._has_android_perm(p)]
+        if not missing:
+            return
+        try:
+            request_permissions(missing)
+        except Exception:
+            pass
 
     def _bind_android_activity_result(self):
         if self._android_camera_bound or android_activity is None:
@@ -595,12 +613,31 @@ class TongueApp(MDApp):
     def _ensure_local_image_path(self, source_path: str) -> str:
         if not source_path:
             return ""
-        # 普通文件路径直接使用
-        if source_path.startswith("/") or source_path.startswith("file://"):
+        if platform != "android":
             return source_path.replace("file://", "")
+
+        # Android 下统一拷贝到 app 私有目录，规避临时 URI/临时文件失效导致 Errno2。
+        target_dir = Path(self.user_data_dir) / "picked"
+        target_dir.mkdir(parents=True, exist_ok=True)
+        target = str(target_dir / f"pick_{int(time.time() * 1000)}.jpg")
+
+        # file:// 或绝对路径：直接复制
+        raw = source_path
+        if raw.startswith("file://"):
+            raw = unquote(raw.replace("file://", ""))
+        if raw.startswith("/") and os.path.exists(raw):
+            try:
+                ext = Path(raw).suffix.lower() or ".jpg"
+                final_target = str(target_dir / f"pick_{int(time.time() * 1000)}{ext}")
+                shutil.copy2(raw, final_target)
+                return final_target
+            except Exception:
+                return ""
+
         # 仅 Android 处理 content:// URI
-        if not source_path.startswith("content://") or platform != "android" or autoclass is None:
-            return source_path
+        if not source_path.startswith("content://") or autoclass is None:
+            # 兜底：如果路径存在则返回，否则失败
+            return source_path if os.path.exists(source_path) else ""
         try:
             PythonActivity = autoclass("org.kivy.android.PythonActivity")
             Uri = autoclass("android.net.Uri")
@@ -613,10 +650,10 @@ class TongueApp(MDApp):
                 suffix = ".png"
             elif "webp" in mime:
                 suffix = ".webp"
-            target_dir = Path(self.user_data_dir) / "picked"
-            target_dir.mkdir(parents=True, exist_ok=True)
             target = str(target_dir / f"pick_{int(time.time() * 1000)}{suffix}")
             ins = resolver.openInputStream(uri)
+            if ins is None:
+                return ""
             outs = FileOutputStream(target)
             try:
                 while True:
@@ -634,7 +671,7 @@ class TongueApp(MDApp):
                     outs.close()
                 except Exception:
                     pass
-            return target
+            return target if os.path.exists(target) else ""
         except Exception:
             return ""
 
@@ -813,6 +850,14 @@ class TongueApp(MDApp):
     def analyze_now(self):
         user_text = self.root.ids.note_input.text.strip()
         has_image = bool(self.selected_image_path)
+        if has_image:
+            # 发送前再次确保图片是可读本地文件，避免 content/临时路径导致 Errno2。
+            repaired = self._ensure_local_image_path(self.selected_image_path)
+            if not repaired or not os.path.exists(repaired):
+                self._snack("图片路径失效，请重新选择图片后再发送")
+                return
+            self.selected_image_path = repaired
+
         if not has_image and not user_text:
             self._snack("请输入问题，或先选择/拍摄舌象图片")
             return

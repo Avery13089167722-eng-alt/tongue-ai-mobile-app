@@ -1,4 +1,5 @@
 from typing import Dict, Optional
+import os
 
 import requests
 
@@ -35,7 +36,7 @@ class LLMApiClient:
         }
         url = f"{self.base_url}{self.api_path}"
         with open(image_path, "rb") as f:
-            files = {"file": (image_path.split("\\")[-1], f, "application/octet-stream")}
+            files = {"file": (os.path.basename(image_path), f, "application/octet-stream")}
             resp = requests.post(url, data=form_data, files=files, headers=headers, timeout=self.timeout)
         resp.raise_for_status()
         return resp.json()
