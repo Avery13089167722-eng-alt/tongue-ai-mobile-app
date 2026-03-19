@@ -49,10 +49,16 @@ except Exception:
     camera = None
 
 try:
-    from android.permissions import Permission, request_permissions
+    from plyer import filechooser
+except Exception:
+    filechooser = None
+
+try:
+    from android.permissions import Permission, request_permissions, check_permission
 except Exception:
     Permission = None
     request_permissions = None
+    check_permission = None
 
 
 KV_FILE = "ui.kv"
@@ -499,6 +505,21 @@ class TongueApp(MDApp):
         return str(p)
 
     def pick_image(self):
+        # Android：直接拉起系统相册，用户选择后自动回填。
+        if platform == "android" and filechooser is not None:
+            try:
+                filechooser.open_file(
+                    on_selection=self._on_android_pick_image,
+                    multiple=False,
+                    filters=["*.jpg", "*.jpeg", "*.png", "*.webp"],
+                    use_extensions=True,
+                )
+                return
+            except Exception:
+                self._snack("打开系统相册失败，请重试")
+                return
+
+        # 桌面端保留文件选择弹窗。
         chooser = FileChooserListView(
             path=os.path.expanduser("~"),
             filters=["*.jpg", "*.jpeg", "*.png", "*.webp"],
@@ -526,6 +547,76 @@ class TongueApp(MDApp):
         chooser.bind(selection=_on_sel)
         self.dialog.open()
 
+    def _on_android_pick_image(self, selection):
+        # plyer 回调可能在非主线程，UI 更新回到主线程执行。
+        Clock.schedule_once(lambda *_: self._apply_android_pick_result(selection), 0)
+
+    def _apply_android_pick_result(self, selection):
+        if not selection:
+            self._snack("未选择图片")
+            return
+        try:
+            picked = selection[0]
+        except Exception:
+            self._snack("选择图片失败")
+            return
+        self.selected_image_path = str(picked)
+        self.has_image_preview = True
+        self._update_analyze_button()
+        self._snack("图片加载成功")
+
+    def _required_android_perms_for_capture(self):
+        if not Permission:
+            return []
+        names = [
+            "CAMERA",
+            "READ_MEDIA_IMAGES",      # Android 13+
+            "READ_EXTERNAL_STORAGE",  # Android 12 及以下
+            "WRITE_EXTERNAL_STORAGE",
+        ]
+        perms = []
+        for n in names:
+            v = getattr(Permission, n, None)
+            if v and v not in perms:
+                perms.append(v)
+        return perms
+
+    def _has_android_perm(self, perm):
+        if not perm:
+            return True
+        if check_permission is None:
+            return True
+        try:
+            return bool(check_permission(perm))
+        except Exception:
+            return True
+
+    def _request_capture_permissions_then(self, on_granted):
+        perms = self._required_android_perms_for_capture()
+        if not perms or request_permissions is None:
+            on_granted()
+            return
+        missing = [p for p in perms if not self._has_android_perm(p)]
+        if not missing:
+            on_granted()
+            return
+
+        def _cb(_permissions, grants):
+            ok = True
+            try:
+                ok = all(bool(x) for x in grants)
+            except Exception:
+                ok = False
+            if ok:
+                Clock.schedule_once(lambda *_: on_granted(), 0)
+            else:
+                Clock.schedule_once(lambda *_: self._snack("未授予拍照所需权限"), 0)
+
+        try:
+            request_permissions(missing, _cb)
+        except Exception:
+            self._snack("权限请求失败，请到系统设置开启相机权限")
+
     def capture_image(self):
         if platform != "android":
             self._snack("拍照功能需在 Android 真机使用")
@@ -533,14 +624,20 @@ class TongueApp(MDApp):
         if camera is None:
             self._snack("未检测到拍照组件，请确认已安装 plyer")
             return
+        self._request_capture_permissions_then(self._do_capture_image)
 
+    def _do_capture_image(self):
         # Android 上写入目录使用 user_data_dir，保证可写且跨设备可用。
         capture_dir = Path(self.user_data_dir) / "captures"
         capture_dir.mkdir(parents=True, exist_ok=True)
         filename = datetime.now().strftime("tongue_%Y%m%d_%H%M%S.jpg")
         target = str(capture_dir / filename)
         self._set_loading(True, "正在打开相机，请拍摄舌象...")
-        camera.take_picture(filename=target, on_complete=self._on_camera_complete)
+        try:
+            camera.take_picture(filename=target, on_complete=self._on_camera_complete)
+        except Exception:
+            self._set_loading(False)
+            self._snack("拍照启动失败，请检查系统相机权限")
 
     def _on_camera_complete(self, filepath):
         Clock.schedule_once(lambda *_: self._apply_camera_result(filepath), 0)
