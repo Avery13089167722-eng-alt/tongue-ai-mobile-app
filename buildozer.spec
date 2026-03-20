@@ -4,7 +4,7 @@ package.name = shezhengzhixi
 package.domain = com.shezhengzhixi.app
 source.dir = .
 source.include_exts = py,kv,json,png,jpg,jpeg,webp,db,ttf,otf,ttc
-version = 0.2.4
+version = 0.2.5
 orientation = portrait
 fullscreen = 1
 

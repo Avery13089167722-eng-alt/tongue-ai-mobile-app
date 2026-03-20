@@ -864,30 +864,16 @@ class TongueApp(MDApp):
             act = PythonActivity.mActivity
             if intent.resolveActivity(act.getPackageManager()) is None:
                 return False
-
-            # 创建输出文件 URI，保存完整图片
-            from jnius import cast
-            File = autoclass("java.io.File")
-            Uri = autoclass("android.net.Uri")
+            # 通过 MediaStore 预分配输出 URI，避免 FileProvider 配置缺失导致的相机无法启动。
             ContentValues = autoclass("android.content.ContentValues")
-
-            # 创建 captures 目录
-            capture_dir = Path(self.user_data_dir) / "captures"
-            capture_dir.mkdir(parents=True, exist_ok=True)
-
-            # 生成唯一的文件名
+            resolver = act.getContentResolver()
+            values = ContentValues()
             filename = f"tongue_{int(time.time() * 1000)}.jpg"
-            output_file = File(str(capture_dir), filename)
-
-            # 使用 FileProvider 获取 URI
-            try:
-                # 尝试使用 FileProvider
-                authority = f"{act.getPackageName()}.provider"
-                file_provider = autoclass("androidx.core.content.FileProvider")
-                photo_uri = file_provider.getUriForFile(act, authority, output_file)
-            except Exception:
-                # 如果 FileProvider 不可用，尝试直接创建 URI
-                photo_uri = Uri.fromFile(output_file)
+            values.put("_display_name", filename)
+            values.put("mime_type", "image/jpeg")
+            photo_uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+            if photo_uri is None:
+                return False
 
             # 设置输出 URI
             intent.putExtra(MediaStore.EXTRA_OUTPUT, photo_uri)
@@ -896,9 +882,9 @@ class TongueApp(MDApp):
             intent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
             intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 
-            # 保存 URI 供后续使用
+            # 保存 URI；回调时如需要可从 URI 再次落地到本地文件。
             self._camera_output_uri = str(photo_uri.toString())
-            self._camera_output_path = str(output_file.getAbsolutePath())
+            self._camera_output_path = ""
 
             act.startActivityForResult(intent, self._camera_request_code)
             return True
@@ -1018,6 +1004,17 @@ class TongueApp(MDApp):
             self._update_analyze_button()
             self._snack("拍照成功，已加载图片")
             return
+
+        # MediaStore URI 方案：从预保存的 content:// 回读并落地到本地。
+        uri = getattr(self, "_camera_output_uri", "")
+        if uri:
+            local = self._ensure_local_image_path(uri)
+            if local:
+                self.selected_image_path = str(Path(local).resolve())
+                self.has_image_preview = True
+                self._update_analyze_button()
+                self._snack("拍照成功，已加载图片")
+                return
 
         # 如果预设路径失败，尝试从 Intent 获取缩略图
         if intent is not None:
