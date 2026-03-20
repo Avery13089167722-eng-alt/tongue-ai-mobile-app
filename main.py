@@ -32,6 +32,7 @@ from kivy.properties import BooleanProperty, StringProperty
 from kivy.core.text import LabelBase
 from kivy.uix.filechooser import FileChooserListView
 from kivy.uix.image import AsyncImage
+from kivy.uix.scrollview import ScrollView
 from kivy.uix.widget import Widget
 from kivymd.app import MDApp
 from kivymd.uix.button import MDRaisedButton, MDTextButton
@@ -256,6 +257,40 @@ class TongueApp(MDApp):
         can_submit = has_image or bool(question)
         self.root.ids.analyze_btn.disabled = not can_submit
 
+    def _open_conversation_menu(self):
+        """右上角菜单：新建对话 / 跳转最近 / 管理历史。"""
+        try:
+            # 如果已有对话管理弹窗，先关闭避免层叠。
+            if self.dialog:
+                self.dialog.dismiss()
+        except Exception:
+            pass
+
+        self.dialog = MDDialog(
+            title="对话菜单",
+            text="请选择操作：",
+            buttons=[
+                MDRaisedButton(
+                    text="新建对话",
+                    on_release=lambda *_: (self.dialog.dismiss(), self._clear_chat_ui()),
+                ),
+                MDRaisedButton(
+                    text="跳到最近",
+                    on_release=lambda *_: (self.dialog.dismiss(), self._load_latest_record_to_chat()),
+                ),
+                MDRaisedButton(
+                    text="管理历史",
+                    on_release=lambda *_: (self.dialog.dismiss(), self._open_history_manager_dialog()),
+                ),
+                MDTextButton(
+                    text="取消",
+                    on_release=lambda *_: self.dialog.dismiss(),
+                ),
+            ],
+            auto_dismiss=False,
+        )
+        self.dialog.open()
+
     def _on_chat_scroll(self, _instance, value):
         # 保留接口但不再使用（取消自动滚动后不会影响体验）
         return
@@ -408,6 +443,132 @@ class TongueApp(MDApp):
             pass
 
         return label
+
+    def _clear_chat_ui(self):
+        chat_list = self.root.ids.get("chat_list")
+        if not chat_list:
+            return
+        chat_list.clear_widgets()
+        self._assistant_label = None
+        self._assistant_row = None
+
+        # 清空当前输入与选中态，确保不会把旧图片带入下一次提问。
+        if "note_input" in self.root.ids:
+            self.root.ids.note_input.text = ""
+        self.selected_image_path = ""
+        self.has_image_preview = False
+        self._update_analyze_button()
+
+    def _load_latest_record_to_chat(self):
+        recs = self.storage.list_records(limit=1)
+        if not recs:
+            self._snack("暂无历史对话可跳转")
+            return
+        rec = recs[0]
+        self._clear_chat_ui()
+
+        # 仅展示已保存的“对话内容（分析结果）”
+        img = (rec.get("image_path") or "").strip()
+        if img:
+            self._append_chat_message("user", "", image_path=img)
+        full = self._sanitize_reply_text(rec.get("full_result") or "")
+        self._append_chat_message("assistant", full)
+
+    def _delete_record_and_refresh(self, record_id: int):
+        ok = False
+        try:
+            ok = self.storage.delete_record(record_id)
+        except Exception:
+            ok = False
+        if ok:
+            self._snack("已删除该对话")
+        else:
+            self._snack("删除失败")
+
+    def _open_history_manager_dialog(self):
+        records = self.storage.list_records(limit=20)
+
+        list_container = MDBoxLayout(
+            orientation="vertical",
+            size_hint_y=None,
+            padding=0,
+            spacing="8dp",
+        )
+        list_container.bind(minimum_height=list_container.setter("height"))
+
+        # 简单用“文本行 + 2个按钮”管理记录
+        for rec in records:
+            rid = rec.get("id")
+            created_at = rec.get("created_at") or ""
+            brief = (rec.get("brief_result") or "").strip()
+            line_text = f"{created_at}  {brief[:18]}"
+
+            row = MDBoxLayout(
+                orientation="horizontal",
+                size_hint_y=None,
+                height="48dp",
+                padding=("12dp", 0, "12dp", 0),
+                spacing="10dp",
+            )
+            label = MDLabel(
+                text=line_text,
+                size_hint_x=1,
+                halign="left",
+                valign="middle",
+                theme_text_color="Custom",
+                text_color=(0.9, 0.95, 1, 1),
+            )
+            label.bind(size=lambda *_: setattr(label, "text_size", label.size))
+
+            def _mk_open(_rid):
+                return lambda *_: (
+                    self.dialog.dismiss(),
+                    self._load_chat_record_into_chat(_rid),
+                )
+
+            def _mk_delete(_rid):
+                return lambda *_: self._delete_record_and_refresh(_rid)
+
+            row.add_widget(label)
+            row.add_widget(
+                MDTextButton(
+                    text="打开",
+                    on_release=_mk_open(rid),
+                )
+            )
+            row.add_widget(
+                MDTextButton(
+                    text="删除",
+                    on_release=_mk_delete(rid),
+                )
+            )
+            list_container.add_widget(row)
+
+        scroll = ScrollView(size_hint=(1, 0.9), do_scroll_y=True, do_scroll_x=False)
+        scroll.add_widget(list_container)
+
+        self.dialog = MDDialog(
+            title="管理历史对话",
+            type="custom",
+            content_cls=scroll,
+            auto_dismiss=False,
+            buttons=[
+                MDRaisedButton(text="关闭", on_release=lambda *_: self.dialog.dismiss()),
+            ],
+        )
+        self.dialog.open()
+
+    def _load_chat_record_into_chat(self, record_id: int):
+        rec = self.storage.get_record(record_id)
+        if not rec:
+            self._snack("该对话不存在")
+            return
+        self._clear_chat_ui()
+        img = (rec.get("image_path") or "").strip()
+        if img:
+            self._append_chat_message("user", "", image_path=img)
+        full = self._sanitize_reply_text(rec.get("full_result") or "")
+        self._append_chat_message("assistant", full)
 
     def _refresh_message_height(self, label, new_text: str):
         meta = self._msg_meta.get(label)
@@ -879,16 +1040,31 @@ class TongueApp(MDApp):
         if self.dialog:
             self.dialog.dismiss()
 
+    def _cleanup_upload_temp(self, upload_image_path: str):
+        """清理上传暂存区，避免下一次提问仍携带上一张图片。"""
+        if not upload_image_path:
+            return
+        try:
+            uploads_dir = Path(self.user_data_dir) / "uploads"
+            p = Path(str(upload_image_path))
+            if p.is_file() and str(p).startswith(str(uploads_dir)):
+                p.unlink()
+        except Exception:
+            pass
+
     def analyze_now(self):
         user_text = self.root.ids.note_input.text.strip()
         has_image = bool(self.selected_image_path)
+        upload_image_path = ""
+        display_image_path = ""
+
         if has_image:
-            # 发送前统一拷贝到上传暂存目录，避免路径失效导致上传失败。
-            staged = self._stage_image_for_upload(self.selected_image_path)
-            if not staged:
+            # display：展示/历史使用；upload：仅用于请求
+            display_image_path = str(self.selected_image_path)
+            upload_image_path = self._stage_image_for_upload(display_image_path)
+            if not upload_image_path:
                 self._snack("图片路径失效，请重新选择图片后再发送")
                 return
-            self.selected_image_path = staged
 
         if not has_image and not user_text:
             self._snack("请输入问题，或先选择图片")
@@ -897,7 +1073,10 @@ class TongueApp(MDApp):
         # 发消息：先把用户输入展示出来。
         if has_image:
             user_msg = user_text if user_text else ""
-            self._append_chat_message("user", user_msg, image_path=self.selected_image_path)
+            self._append_chat_message("user", user_msg, image_path=display_image_path)
+            # 清空选中态，避免下一次仍携带上一张图片
+            self.selected_image_path = ""
+            self.has_image_preview = False
         else:
             self._append_chat_message("user", user_text)
 
@@ -915,11 +1094,11 @@ class TongueApp(MDApp):
         self._set_loading(True)
         threading.Thread(
             target=self._analyze_worker,
-            args=("image" if has_image else "text", self.selected_image_path or "", user_text),
+            args=("image" if has_image else "text", upload_image_path, display_image_path, user_text),
             daemon=True,
         ).start()
 
-    def _analyze_worker(self, mode: str, image_path: str, user_note: str):
+    def _analyze_worker(self, mode: str, upload_image_path: str, display_image_path: str, user_note: str):
         headers = {}
         token = self.config_data.get("api_token", "").strip()
         if token:
@@ -934,7 +1113,7 @@ class TongueApp(MDApp):
             try:
                 if mode == "image":
                     data = self.api_client.analyze_tongue_image(
-                        image_path=image_path,
+                        image_path=upload_image_path,
                         user_note=user_note,
                         extra_headers=headers,
                     )
@@ -942,7 +1121,7 @@ class TongueApp(MDApp):
                     data = self.api_client.text_chat(question=user_note, extra_headers=headers)
 
                 Clock.schedule_once(
-                    lambda *_: self._on_analyze_success(data, image_path, mode),
+                    lambda *_: self._on_analyze_success(data, display_image_path, mode, upload_image_path),
                     0,
                 )
                 return
@@ -958,9 +1137,9 @@ class TongueApp(MDApp):
                     )
                     time.sleep(wait_sec)
 
-        Clock.schedule_once(lambda *_: self._on_analyze_failed(last_error, mode), 0)
+        Clock.schedule_once(lambda *_: self._on_analyze_failed(last_error, mode, upload_image_path), 0)
 
-    def _on_analyze_success(self, data, image_path, mode: str):
+    def _on_analyze_success(self, data, image_path, mode: str, upload_image_path: str = ""):
         self._set_loading(False)
         answer = str(data.get("answer", "")).strip()
         brief = answer[:40] if answer else "分析完成"
@@ -983,7 +1162,10 @@ class TongueApp(MDApp):
             self._refresh_message_height(self._assistant_label, full)
         self._restore_scroll_y(prev_scroll_y)
 
-    def _on_analyze_failed(self, msg, mode: str = "image"):
+        if upload_image_path:
+            Clock.schedule_once(lambda *_: self._cleanup_upload_temp(upload_image_path), 0.2)
+
+    def _on_analyze_failed(self, msg, mode: str = "image", upload_image_path: str = ""):
         self._set_loading(False)
         lower = msg.lower()
 
@@ -1015,6 +1197,9 @@ class TongueApp(MDApp):
             )
         self._restore_scroll_y(prev_scroll_y)
 
+        if upload_image_path:
+            Clock.schedule_once(lambda *_: self._cleanup_upload_temp(upload_image_path), 0.2)
+
     def _set_loading(self, is_loading: bool, text: str = ""):
         self.root.ids.analyze_btn.disabled = True if is_loading else False
         self.root.ids.progress_bar.opacity = 1 if is_loading else 0
@@ -1040,11 +1225,12 @@ class TongueApp(MDApp):
 
     def _show_record_detail(self, rec, *_):
         img = (rec.get("image_path") or "").strip()
+        full = self._sanitize_reply_text(rec.get("full_result") or "")
         msg = (
             f"时间: {rec['created_at']}\n\n"
             + (f"图片: {img}\n\n" if img else "图片:（仅文本）\n\n")
             + f"模型: {rec['model_name']}\n\n"
-            + f"结论:\n{rec['full_result']}"
+            + f"结论:\n{full}"
         )
         self.dialog = MDDialog(
             title="历史分析详情",

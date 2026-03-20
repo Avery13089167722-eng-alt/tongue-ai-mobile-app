@@ -42,6 +42,19 @@ MDScreen:
                 theme_text_color: "Custom"
                 text_color: 1, 1, 1, 1
 
+            Widget:
+                size_hint_x: 1
+
+            MDIconButton:
+                icon: "dots-vertical"
+                theme_text_color: "Custom"
+                text_color: 0.75, 0.78, 0.85, 1
+                user_font_size: "26sp"
+                on_release: app._open_conversation_menu()
+                size_hint: None, None
+                size: "44dp", "44dp"
+                padding: 0
+
         # 聊天区域
         ScrollView:
             id: chat_scroll

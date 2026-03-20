@@ -85,3 +85,52 @@ class LocalStorage:
         finally:
             conn.close()
 
+    def get_record(self, record_id: int) -> Optional[Dict]:
+        """按 id 获取单条记录。"""
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT id, created_at, image_path, brief_result, full_result, model_name, confidence
+                FROM analysis_records
+                WHERE id = ?
+                """,
+                (record_id,),
+            )
+            row = cur.fetchone()
+            if not row:
+                return None
+            return {
+                "id": row[0],
+                "created_at": row[1],
+                "image_path": row[2],
+                "brief_result": row[3] or "",
+                "full_result": row[4] or "",
+                "model_name": row[5] or "",
+                "confidence": row[6],
+            }
+        finally:
+            conn.close()
+
+    def delete_record(self, record_id: int) -> bool:
+        """删除单条记录。"""
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM analysis_records WHERE id = ?", (record_id,))
+            conn.commit()
+            return cur.rowcount > 0
+        finally:
+            conn.close()
+
+    def delete_all_records(self) -> None:
+        """清空所有历史记录。"""
+        conn = self._get_conn()
+        try:
+            cur = conn.cursor()
+            cur.execute("DELETE FROM analysis_records")
+            conn.commit()
+        finally:
+            conn.close()
+
