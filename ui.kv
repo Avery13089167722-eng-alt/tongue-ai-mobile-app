@@ -78,12 +78,12 @@ MDScreen:
                 color: 0.3, 0.7, 1, 1
                 size_hint_x: 1
 
-        # 输入区域
+        # 底部输入栏：选图 + 弹性输入 + 发送，垂直居中对齐
         MDBoxLayout:
             size_hint_y: None
-            height: "72dp"
-            padding: "12dp", "8dp", "12dp", "8dp"
-            spacing: "8dp"
+            height: "88dp"
+            padding: "14dp", "12dp", "14dp", "14dp"
+            spacing: "10dp"
             canvas.before:
                 Color:
                     rgba: 0.10, 0.10, 0.12, 1
@@ -96,74 +96,77 @@ MDScreen:
                     points: self.x, self.top, self.right, self.top
                     width: 1
 
-            # 拍照按钮
-            MDIconButton:
-                icon: "camera"
-                theme_text_color: "Custom"
-                text_color: 0.6, 0.6, 0.6, 1
-                user_font_size: "24sp"
-                on_release: app.capture_image()
+            AnchorLayout:
                 size_hint_x: None
-                width: "48dp"
-                padding: "12dp"
+                width: "52dp"
+                anchor_x: "center"
+                anchor_y: "center"
 
-            # 选图按钮
-            MDIconButton:
-                icon: "image"
-                theme_text_color: "Custom"
-                text_color: 0.6, 0.6, 0.6, 1
-                user_font_size: "24sp"
-                on_release: app.pick_image()
-                size_hint_x: None
-                width: "48dp"
-                padding: "12dp"
+                MDIconButton:
+                    icon: "image"
+                    theme_text_color: "Custom"
+                    text_color: 0.75, 0.78, 0.85, 1
+                    user_font_size: "26sp"
+                    on_release: app.pick_image()
+                    size_hint: None, None
+                    size: "48dp", "48dp"
 
-            # 输入框容器
-            MDBoxLayout:
+            AnchorLayout:
                 size_hint_x: 1
-                padding: "8dp", "4dp", "8dp", "4dp"
-                canvas.before:
-                    Color:
-                        rgba: 0.15, 0.15, 0.17, 1
-                    RoundedRectangle:
-                        pos: self.pos
-                        size: self.size
-                        radius: [20, 20, 20, 20]
+                anchor_x: "center"
+                anchor_y: "center"
 
-                TextInput:
-                    id: note_input
-                    font_name: "Roboto"
-                    hint_text: "输入问题或选择舌象图片..."
-                    hint_text_color: 0.5, 0.5, 0.5, 1
-                    multiline: False
+                MDBoxLayout:
+                    orientation: "vertical"
                     size_hint_x: 1
                     size_hint_y: None
-                    height: "40dp"
-                    on_text_validate: app.analyze_now()
-                    foreground_color: 1, 1, 1, 1
-                    cursor_color: 0.3, 0.7, 1, 1
-                    background_color: 0.15, 0.15, 0.17, 1
-                    padding: "12dp", "10dp"
-                    font_size: "16sp"
+                    height: "50dp"
+                    padding: "10dp", "5dp", "10dp", "5dp"
+                    canvas.before:
+                        Color:
+                            rgba: 0.15, 0.15, 0.18, 1
+                        RoundedRectangle:
+                            pos: self.pos
+                            size: self.size
+                            radius: [22, 22, 22, 22]
 
-            # 发送按钮
-            MDIconButton:
-                id: analyze_btn
-                icon: "send"
-                theme_text_color: "Custom"
-                text_color: 0.3, 0.7, 1, 1
-                user_font_size: "24sp"
-                disabled: True
-                on_release: app.analyze_now()
+                    TextInput:
+                        id: note_input
+                        font_name: "Roboto"
+                        hint_text: "输入问题，或点左侧选图…"
+                        hint_text_color: 0.45, 0.48, 0.52, 1
+                        multiline: False
+                        size_hint_x: 1
+                        size_hint_y: None
+                        height: "40dp"
+                        on_text_validate: app.analyze_now()
+                        foreground_color: 1, 1, 1, 1
+                        cursor_color: 0.3, 0.7, 1, 1
+                        background_color: 0.15, 0.15, 0.18, 0
+                        padding: "10dp", "8dp"
+                        font_size: "16sp"
+
+            AnchorLayout:
                 size_hint_x: None
-                width: "48dp"
-                padding: "12dp"
-                canvas.before:
-                    Color:
-                        rgba: 0.3, 0.7, 1, 0.2 if not self.disabled else 0.1
-                    Ellipse:
-                        pos: self.pos
-                        size: self.size
-                        angle_start: 0
-                        angle_end: 360
+                width: "52dp"
+                anchor_x: "center"
+                anchor_y: "center"
 
+                MDIconButton:
+                    id: analyze_btn
+                    icon: "send"
+                    theme_text_color: "Custom"
+                    text_color: 0.3, 0.7, 1, 1
+                    user_font_size: "26sp"
+                    disabled: True
+                    on_release: app.analyze_now()
+                    size_hint: None, None
+                    size: "48dp", "48dp"
+                    canvas.before:
+                        Color:
+                            rgba: 0.3, 0.7, 1, 0.22 if not self.disabled else 0.08
+                        Ellipse:
+                            pos: self.pos
+                            size: self.size
+                            angle_start: 0
+                            angle_end: 360
