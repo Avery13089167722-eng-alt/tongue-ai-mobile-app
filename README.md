@@ -31,8 +31,8 @@ Header:
 `Content-Type` 由 `multipart/form-data` 自动生成
 Body（multipart/form-data）:
 
-`file`：图片二进制（必填）
-`question`：补充提问（可选）
+`文件`：图片二进制（必填）
+`问题`：补充提问（可选）
 `max_new_tokens`：最大输出 token（可选，默认 512）
 
 服务端返回（实际）：
