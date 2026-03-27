@@ -1,0 +1,40 @@
+# 此工作流将安装Python依赖项，使用多种Python版本运行测试和代码风格检查
+# 有关更多信息，请参阅：https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
+
+名称: Python软件包
+
+启用:
+推送:
+分支: [ "master" ]
+拉取请求:
+分支: [ "master" ]
+
+作业:
+构建:
+
+运行于: ubuntu-latest
+策略:
+快速失败: false
+矩阵:
+Python版本: ["3.9", "3.10", "3.11"]
+
+步骤:
+    - 使用: actions/checkout@v4
+设置 Python ${matrix.python-version}}}
+使用: actions/setup-python@v3
+与:
+        python-version: ${{ matrix.python-version }}
+    - 名称: 安装依赖
+运行: |
+        python -m pip install --upgrade pip
+        python -m pip install flake8 pytest
+如果 [ -f requirements.txt ]; 则 pip install -r requirements.txt; fi
+    - name: 使用flake8进行Lint检查
+运行: |
+# 如果存在 Python 语法错误或未定义的名称，则停止构建
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+# exit-zero 将所有错误视为警告。GitHub 编辑器宽度为 127 个字符
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+- 名称：使用pytest进行测试
+运行: |
+        pytest
