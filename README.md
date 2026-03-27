@@ -1,13 +1,12 @@
 舌征智析手机端TAMA
 
-
 这是一个可打包为 Android APK 的舌象分析应用：
 手机端从相册选择舌象图上传
 调用云端大模型做中医分析
 实时显示分析状态与结果
 历史记录存储在手机本地 SQLite
 
-1. 功能概览
+功能概览
 仿 AI 问答 App 的深色风格界面
 Android 真机相册选图与聊天展示
 分析中进度条反馈
@@ -16,7 +15,7 @@ Android 真机相册选图与聊天展示
 本地历史记录（最近 30 条）
 预留 API Token 鉴权
 
-2. 项目结构
+项目结构
 `main.py`：主应用和交互逻辑
 `ui.kv`：前端界面
 `api_client.py`：云端大模型调用封装
@@ -40,19 +39,19 @@ Body（multipart/form-data）:
 
 ```json
 {
-  "answer": "详细分析文本...",
-  "filename": "tongue_20260319_xxx.jpg"
+“answer”: “详细分析文本...”,
+“filename”: “tongue_20260319_xxx.jpg”
 }
 ```
 
-4. 本地运行
+本地运行
 
 ```bash
 pip install -r requirements.txt
 python main.py
 ```
 
-#5. 打包 APK（推荐 Linux/WSL 环境）
+打包 APK（推荐 Linux/WSL 环境）
 
 由于 Buildozer 对 Linux 支持最佳，建议在 WSL Ubuntu 或 Linux 主机打包：
 
@@ -75,15 +74,16 @@ buildozer -v android debug
 
 生成后的 APK 存储在`bin/`目录，可直接安装到其他 Android 设备。
 
-6. 可移植性说明
+可移植性说明
 应用数据存储在设备本地数据库 `tongue_records.db`
 安装包为标准 APK，可通过 ADB、文件传输、企业分发等方式安装
 只要能访问你的云端 IP 和端口，即可在其他手机使用
 
-7. 下一步建议
+下一步建议
 增加分段结果卡片（体质、寒热、建议）
 增加 SSL（HTTPS）和接口签名
-8. 跨设备字体一致性（已启用）
+
+跨设备字体一致性（已启用）
 项目内置字体：`assets/fonts/NotoSansSC-Regular.ttc`
 应用启动时优先加载该字体并覆盖 Kivy/KivyMD 默认字体
 `buildozer.spec` 已加入 `ttf/otf/ttc`，打包时会包含字体文件
